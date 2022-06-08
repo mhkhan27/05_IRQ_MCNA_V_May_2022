@@ -321,7 +321,7 @@ source("04_script/07_functions.R")
 
 ###################################### CHECK OTHERS ##########################################
 
-text_cols <- (survey %>% filter(type == "text"))$name[!(survey %>% filter(type == "text"))$name%in% c( "enumerator_name" ,"contact_details_name", "referral_contact", "contact_details_telephone") ]
+text_cols <- (survey %>% filter(type == "text"))$name[!(survey %>% filter(type == "text"))$name%in% c( "enumerator_name" ,"contact_details_name", "referral_contact", "referral_name","contact_details_telephone") ]
 text_cols_hh <- text_cols[text_cols %in% names(daily_data)]
 
 others_hh <- daily_data %>% select(X_uuid,text_cols_hh) %>% pivot_longer(cols = text_cols_hh,names_to = "question",values_to = "old_value") %>% filter(!is.na(old_value)) %>% mutate(
@@ -594,7 +594,7 @@ Cleaning_log_final <- Cleaning_log_final %>% left_join(survey_label)
 
 
 Cleaning_log_final <- Cleaning_log_final %>% 
-  select(X_uuid,repeat_uuid,enumerator_name_id,ngo_label,loop,question,`label::English`,`label::Arabic`,old_value,issue,choice_list_from_kobo,pop_group,district,camp_name,contact_details_telephone) %>% 
+  select(X_uuid,repeat_uuid,enumerator_name_id,ngo_label,loop,question,`label::English`,`label::Arabic`,issue,choice_list_from_kobo,pop_group,district,camp_name,contact_details_telephone,old_value) %>% 
   group_by(X_uuid,issue) %>% mutate(
   id = cur_group_id()
 ) 
