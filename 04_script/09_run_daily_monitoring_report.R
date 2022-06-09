@@ -1,8 +1,6 @@
 # download the data 
 # change the start date 
 
-
-
 rm(list = ls())
 
 library(dplyr)
@@ -22,7 +20,7 @@ library(randomcoloR)
 ### variable_to_change
 
 write_file <- c(T,F)[1]
-old_date_log <- read.csv("03_outputs/02_date_log/2022_06_07_date_log.csv")
+old_date_log <- read.csv("03_outputs/02_date_log/2022_06_08_date_log.csv")
 
 
 rmarkdown::render("daily_monitoring_report.Rmd")

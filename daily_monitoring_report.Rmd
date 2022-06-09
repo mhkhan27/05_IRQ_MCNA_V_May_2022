@@ -38,12 +38,10 @@ cat("
 knitr::opts_chunk$set(echo = T, cache = FALSE,comment = NA, message = FALSE, warning=FALSE, fig.align = 'center')
 
 
-
-
 # read data
-data <- read.csv("01_inputs/04_raw_data/hh.csv",stringsAsFactors = F,na.strings = c("", " ","9999",9999),encoding = "UTF-8") %>% rename(
-  start = X.U.FEFF.start
-)
+data <- read.csv("01_inputs/04_raw_data/hh.csv",stringsAsFactors = F,na.strings = c("", " ","9999",9999),encoding = "UTF-8") #%>% rename(
+  #start = X.U.FEFF.start
+#)
 indv <- read.csv("01_inputs/04_raw_data/indv.csv",stringsAsFactors = F,na.strings = c("", " ","9999",9999),encoding = "UTF-8") %>% rename(
   X_uuid = X_submission__uuid
 )
@@ -321,7 +319,7 @@ source("04_script/07_functions.R")
 
 ###################################### CHECK OTHERS ##########################################
 
-text_cols <- (survey %>% filter(type == "text"))$name[!(survey %>% filter(type == "text"))$name%in% c( "enumerator_name" ,"contact_details_name", "referral_contact", "referral_name","contact_details_telephone") ]
+text_cols <- (survey %>% filter(type == "text"))$name[!(survey %>% filter(type == "text"))$name%in% c( "enumerator_name" ,"contact_details_name", "referral_contact","referral_name", "contact_details_telephone") ]
 text_cols_hh <- text_cols[text_cols %in% names(daily_data)]
 
 others_hh <- daily_data %>% select(X_uuid,text_cols_hh) %>% pivot_longer(cols = text_cols_hh,names_to = "question",values_to = "old_value") %>% filter(!is.na(old_value)) %>% mutate(
@@ -428,9 +426,7 @@ all_cleaning_log[["duration"]] <-  enumerator_duration %>% left_join(mean_median
 
 hc_sp <- st_read("03_outputs/01_sampling/03_sample_point/01_host_community/01_map_and_kml/full_map/HC_sample_point_all.shp")
 out_camp_idp_sp <- st_read("03_outputs/01_sampling/03_sample_point/02_IDPs/02_out_camp/total/all_point.kml")
-file_list <- list.files("03_outputs\\01_sampling\\03_sample_point\\02_IDPs\\01_in_camp",pattern = ".ini",full.names = T)
-unlink(file_list)
-in_camp_idp_sp <- merge_kml(input_folder = "03_outputs\\01_sampling\\03_sample_point\\02_IDPs\\01_in_camp")
+in_camp_idp_sp <- merge_kml(input_folder = "03_outputs/01_sampling/03_sample_point/02_IDPs/01_in_camp/")
 returnee_sp <- st_read("03_outputs/01_sampling/03_sample_point/03_Returnees/total/all_points.kml")
 
 daily_data_sf <- st_as_sf(daily_data, coords = c("X_gpslocation_longitude","X_gpslocation_latitude"),crs = 4326)
