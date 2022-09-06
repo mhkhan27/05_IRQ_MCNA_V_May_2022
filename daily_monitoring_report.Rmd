@@ -38,14 +38,33 @@ cat("
 knitr::opts_chunk$set(echo = T, cache = FALSE,comment = NA, message = FALSE, warning=FALSE, fig.align = 'center')
 
 
+# cleaning_log
+cl_list <- list.files(mcna_one_drive_folder,".xlsx",full.names = T)
+
+cleaning_log <- list()
+for (i in cl_list ){
+  cleaning_log[[i]] <- read_excel(i,sheet = "CONC") %>% mutate_all(as.character)
+}
+
+Cleaning_log_total <- do.call("bind_rows",cleaning_log)
+
+
+reomve_survey <- Cleaning_log_total %>% filter(change_type == "remove_survey")
+remove_survey_uuid <- reomve_survey$X_uuid
+
+
+
+
 # read data
-data <- read.csv("01_inputs/04_raw_data/hh.csv",stringsAsFactors = F,na.strings = c("", " ","9999",9999),encoding = "UTF-8") #%>% rename(
-  #start = X.U.FEFF.start
-#)
+
+
+data <- data %>% filter(!X_uuid %in% remove_survey_uuid)
+
 indv <- read.csv("01_inputs/04_raw_data/indv.csv",stringsAsFactors = F,na.strings = c("", " ","9999",9999),encoding = "UTF-8") %>% rename(
   X_uuid = X_submission__uuid
 )
 
+indv <- indv %>% filter(!X_uuid %in% remove_survey_uuid)
 
 total_survey <- nrow(data)
 yes_consent <- data %>% filter(consent == "yes" ) %>% nrow() 
@@ -69,6 +88,7 @@ data <- data %>% mutate(
   enumerator_name_id = case_when(ngo_name == "reach" ~ as.character(enumerator_num),
                                   T~as.character(enumerator_name))
 )
+
 
 group_by_pop_grp <- data %>% group_by(pop_group) %>% summarise(
   total_elegible = n()
@@ -104,6 +124,12 @@ data <- data %>% left_join(df_with_adm) %>% mutate(
   district = district %>% tolower() %>% str_replace_all("-","_") %>% str_replace_all(" ","_") %>% str_replace_all("'","")
 )
 
+data <- data %>% mutate(
+  location_camp = case_when(pop_group=="in_camp_idp" ~ paste0("CAMP-",camp_name),
+                            pop_group == "out_camp_idp" ~ paste0("OUT_IDP-",cluster_location_id),
+                            pop_group == "returnee" ~ paste0("RETURNEE-",cluster_location_id),
+                            pop_group == "hc" ~ paste0("HC-",district))
+)
 ########################################## sample frames ########################################################################
 
 hc_sf <- read.csv("03_outputs/01_sampling/02_sampling/01_host_community/sampling_summary.csv") %>%
@@ -317,6 +343,38 @@ all_cleaning_log <- list()
 source("04_script/07_functions.R")
 #### DATA CLEANING
 
+######################################## NGO/district check ###############################################
+
+care <- "al_amadiya"
+coopi_and_pin <- "al_hatra"
+drc <- "al_baaj"
+youth_save <- "al_mussyab"
+asb <- "al_kaim"
+
+partner_district <- c(care,coopi_and_pin,drc,youth_save,asb)
+
+all_cleaning_log[["dist_ngo"]] <- daily_data %>% mutate(
+  distctric_check = case_when(ngo_name == "care"& district_mcna == "al_amadiya" ~ "ok",
+                              ngo_name == "coopi" & district_mcna == "al_hatra" ~ "ok",
+                              ngo_name == "people_in_need" & district_mcna == "al_hatra" ~ "ok",
+                              ngo_name == "drc" & district_mcna == "al_baaj" ~ "ok",
+                              ngo_name == "youth_save_organisation" & district_mcna == "al_mussyab" ~ "ok",
+                              ngo_name == "arbeiter_samariter_bund_deutschland" & district_mcna == "al_kaim" ~ "ok",
+                              ngo_name == "reach" & !district_mcna %in% partner_district ~ "ok",
+                              T~ "not_ok")
+) %>% filter(distctric_check== "not_ok" & !is.na(district_mcna)) %>% select(X_uuid,ngo_name,district_mcna) %>% pivot_longer(cols = !X_uuid,names_to = "question",values_to = "old_value") %>% mutate(
+  issue= "NGOs reported district where they were not supposed to collect data"
+)
+
+
+######################################## district check ###################################################
+
+ all_cleaning_log[["district_des"]]<- daily_data %>% filter(district_mcna!= district) %>% select(X_uuid,district,district_mcna) %>% pivot_longer(cols = !X_uuid,names_to = "question",values_to = "old_value") %>% mutate(
+  issue = "Mismatch between OCHA district and reported district"
+)
+
+
+
 ###################################### CHECK OTHERS ##########################################
 
 text_cols <- (survey %>% filter(type == "text"))$name[!(survey %>% filter(type == "text"))$name%in% c( "enumerator_name" ,"contact_details_name", "referral_contact","referral_name", "contact_details_telephone") ]
@@ -362,7 +420,16 @@ choice_list <- choice_with_type %>% group_by(list_name) %>% summarise(
   choice_list_from_kobo = paste0(name,collapse=",")
 )
 
-all_cleaning_log[["others"]] <- others_cl_a %>% dplyr::left_join(choice_list,by=c("choice_list" = "list_name" )) %>% select(c("X_uuid", "question", "old_value", "issue", "choice_list_from_kobo"))
+reason_not_choices <- (choice_list %>% filter(list_name == "not_attending_school" ))$choice_list_from_kobo
+
+ others_log <- others_cl_a %>% dplyr::left_join(choice_list,by=c("choice_list" = "list_name" )) %>% select(c("X_uuid", "question", "old_value", "issue", "choice_list_from_kobo")) %>% mutate(
+   choice_list_from_kobo  = case_when( question == "resons_not_attend_other" ~ reason_not_choices,
+                                  T~choice_list_from_kobo)
+ )
+
+
+
+all_cleaning_log[["others"]] <-others_log
 
 
 #################################### Similarity checks #####################################
@@ -370,7 +437,7 @@ all_cleaning_log[["others"]] <- others_cl_a %>% dplyr::left_join(choice_list,by=
 survey_similarity <- calculateDifferences(data, survey) %>% select(X_uuid,n.col.not.NA, survey.id,number.different.columns)
 # enum_similarity <- calculateEnumeratorSimilarity(data, survey, col_enum = "enumerator_name_id", col_admin = "district")
 
-survey_similarity <- survey_similarity %>% left_join(data %>% select(X_uuid,enumerator_name_id,ngo_label))
+survey_similarity <- survey_similarity %>% left_join(data %>% select(X_uuid,enumerator_name_id,governorate,ngo_label))
 
 if(write_file ==T){
 write.csv(survey_similarity,paste0("03_outputs/04_survey_similarity/", str_replace_all(Sys.Date(),"-","_"),"_cleaning_log.csv"))
@@ -471,6 +538,7 @@ map_distance <- leaflet::leaflet() %>%
 
 ############################### outliers checks ####################################
 
+data_out <- data %>% select(X_uuid, )
 
 outlier_hh <- illuminate::outlier_check(df = data,kobo_tool_location = tool_path,cols_to_report = "X_uuid",include_multiple_choices = F)
 outlier_indv <- illuminate::outlier_check(df = indv,kobo_tool_location = tool_path,cols_to_report = c("X_uuid","repeat_uuid"),include_multiple_choices = F)
@@ -527,9 +595,9 @@ uuid_spous <- daily_data %>% mutate(
 
 uuid_spouse_different_gender<- uuid_spous$X_uuid
 
-all_cleaning_log[["spouse_gender_dif"]] <- indv_daily_data %>% filter(relationship == "spouse" & X_uuid %in% uuid_spouse_different_gender) %>% 
-  select(X_uuid,repeat_uuid,sex_member) %>% pivot_longer(cols = sex_member,names_to = "question",values_to = "old_value") %>% 
-  mutate(issue = "Mutiple of spouse and the gender of spouses are different")  %>% mutate_all(as.character)
+all_cleaning_log[["spouse_gender_dif"]] <- indv_daily_data %>% filter(relationship == "spouse" & X_uuid %in% uuid_spouse_different_gender) %>%
+  select(X_uuid,repeat_uuid,sex_member) %>% pivot_longer(cols = sex_member,names_to = "question",values_to = "old_value") %>%
+  mutate(issue = "Mutiple spouse and the gender of spouses are different")  %>% mutate_all(as.character)
 
 
 
@@ -538,6 +606,7 @@ all_cleaning_log[["spouse_gender_dif"]] <- indv_daily_data %>% filter(relationsh
 
 
 logic <- read.csv("01_inputs/06_logical_check/conditions_log.csv")
+logic <- logic %>% filter(id != 14)
 
 if( !"in_camp_idp" %in% unique(daily_data$pop_group)){
   logic <- logic %>% filter(id != 8)
@@ -580,7 +649,7 @@ Cleaning_log_final <- do.call("bind_rows", all_cleaning_log) %>% mutate(
 )
 
 Cleaning_log_final <- Cleaning_log_final %>% filter(!X_uuid %in% old_date_log$X_uuid) %>%  left_join(data %>%
-                                                                                                  select(X_uuid,enumerator_name_id,ngo_label,pop_group,district,camp_name,contact_details_telephone))
+                                                                                                  select(X_uuid,enumerator_name_id,ngo_label,pop_group,district,camp_name,contact_details_telephone,date_assessment,location_camp))
 
 survey_label <- survey %>% select(name,`label::English`,`label::Arabic`) %>% rename(
   question = name
@@ -590,7 +659,7 @@ Cleaning_log_final <- Cleaning_log_final %>% left_join(survey_label)
 
 
 Cleaning_log_final <- Cleaning_log_final %>% 
-  select(X_uuid,repeat_uuid,enumerator_name_id,ngo_label,loop,question,`label::English`,`label::Arabic`,issue,choice_list_from_kobo,pop_group,district,camp_name,contact_details_telephone,old_value) %>% 
+  select(date_assessment,location_camp,X_uuid,repeat_uuid,enumerator_name_id,ngo_label,loop,question,`label::English`,`label::Arabic`,issue,choice_list_from_kobo,pop_group,district,camp_name,contact_details_telephone,old_value) %>% 
   group_by(X_uuid,issue) %>% mutate(
   id = cur_group_id()
 ) 

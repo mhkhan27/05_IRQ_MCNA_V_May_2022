@@ -1,4 +1,6 @@
 #ignore files
+06_remote_sensing_analysis/*
+
 01_inputs/01_sample_frame/*
 01_inputs/02_population/*    
 01_inputs/03_shapefile/*     
@@ -8,7 +10,9 @@
 
 
 03_outputs/01_sampling/*                       
-03_outputs/02_date_log/*                      
+03_outputs/02_date_log/* 
+03_outputs/*  
+                        
 03_outputs/03_audit_temp/*                    
 03_outputs/04_survey_similarity/*              
 03_outputs/05_daily_cleaning_before_feedback/* 
@@ -20,11 +24,12 @@
 *.Rhistory
 *.html
 *.kml
-
+!/06_remote_sensing_analysis/.gitkeep
 !/01_inputs/.gitkeep
 !/02_outputs/.gitkeep
 !/03_others/.gitkeep
 !/05_DAP/.gitkeep
+
 
 !/01_inputs/01_sample_frame/.gitkeep
 !/01_inputs/02_population/.gitkeep    
@@ -41,5 +46,11 @@
 !/03_outputs/05_daily_cleaning_before_feedback/.gitkeep 
 !/03_outputs/06_daily_cleaning_after_feedback/.gitkeep 
 !/03_outputs/07_daily_progress_tracker/.gitkeep 
+
+
+!/03_outputs/09_clean_dataset/.gitkeep 
+!/03_outputs/10_analysis/.gitkeep 
+
+
 
 .Rproj.user
